@@ -204,6 +204,166 @@ Missing columns are handled gracefully — the related charts or the candidate d
 - Requires internet for CDN libraries (can be vendored locally for offline use).
 - Ideas: backend/API with real auth, shared storage, direct Google Sheets API import, role-based views, vendored libraries for offline use.
 
+app script connecting backend servers..
+
+Key Advantages for Local Development
+Zero Local Server Setup: No need to configure express servers, database connections, or API keys locally.
+Auto Sync: Any time anyone updates the Google Sheet, refreshing your localhost page instantly loads the newest candidates.
+CORS Safe: Google Apps Script automatically handles CORS headers, so your localhost browser won't throw cross-origin access errors.
+
+Since your portal is purely a frontend application running locally on localhost, Option 1 (Google Apps Script) is the absolute best fit. It acts as a free backend host for your Google Sheet and allows your localhost page to pull live data dynamically without running local server code (like Node.js or Python).
+Here is the exact step-by-step setup to connect your Google Sheet directly to your local HTML portal:
+
+Step 1: Set Up Google Apps Script
+Open your Google Sheet containing the candidate pipeline data.
+Click Extensions > Apps Script.
+Replace all existing code in Code.gs with this snippet:
+
+JavaScript.
+
+function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  
+  // Extract column headers from the first row
+  var headers = data.shift();
+  
+  // Convert rows into array of objects key-value paired with headers
+  var jsonData = data.map(function(row) {
+    var obj = {};
+    headers.forEach(function(header, i) {
+      obj[header] = row[i];
+    });
+    return obj;
+  });
+
+  // Return formatted JSON output
+  return ContentService.createTextOutput(JSON.stringify(jsonData))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+Step 2: Deploy as a Public Web App API
+Click Deploy (top right) > New Deployment.
+Click the gear icon next to "Select type" and choose Web app.
+Fill out the fields:
+Description: Candidate Data API
+Execute as: Me
+Who has access: Anyone (Crucial so localhost can access it without complex OAuth login flows)
+Click Deploy, authorize access if prompted, and copy the Web App URL (it looks like [https://script.google.com/macros/s/AKfycb.../exec](https://script.google.com/macros/s/AKfycb.../exec)).
+
+Step 3: Fetch Data in Your Frontend (localhost)
+In your local HTML/JS file, replace or wrap your dataset loading logic with this fetch script:
+
+// Replace with your actual Web App URL from Step 2
+const GOOGLE_SHEET_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
+
+async function loadPortalData() {
+  try {
+    const response = await fetch(GOOGLE_SHEET_API_URL);
+    const candidateData = await response.json();
+    
+    console.log("Live Candidate Data Loaded:", candidateData);
+    
+    // Pass candidateData directly to your table rendering & chart update functions
+    renderCandidateTable(candidateData);
+    updateDashboardMetrics(candidateData);
+
+  } catch (error) {
+    console.error("Error fetching Google Sheet data:", error);
+  }
+}
+
+// Call on page load
+document.addEventListener("DOMContentLoaded", loadPortalData);
+
+if live data doesn't fetching 
+
+the reason your live data is not mapping correctly is due to a column name mismatch.
+When your Apps Script fetches your Google Sheet, it reads the exact header text from your row cells. Right now, your portal's parser is looking for exact standard titles like Candidate Name, Recruiter Name, Job Role, and Date Of Submission, but your sheet's columns have different names, which is why 21 out of 23 columns show red ✕ marks in the column check.
+Here is how to sort out this error immediately:
+
+When your Apps Script fetches your Google Sheet, it reads the exact header text from your row cells. Right now, your portal's parser is looking for exact standard titles like Candidate Name, Recruiter Name, Job Role, and Date Of Submission, but your sheet's columns have different names, which is why 21 out of 23 columns show red ✕ marks in the column check.
+Here is how to sort out this error immediately:
+
+Solution 1: Rename the Columns in Your Google Sheet (Recommended)
+The cleanest fix is to update the header row (Row 1) of your active Google Sheet tab so that the column titles match what the portal expects.
+Make sure your Google Sheet header row contains these exact names:
+Candidate Name
+Candidate ID
+Recruiter Name
+Client
+Mode of Req(FTE/C2H)
+Job Role
+Req ID
+Skill Bucket
+Date Of Submission
+Profile Submission Status
+Interview Status
+Final Status
+Current Location
+Mobile No
+Email ID
+Current Company
+Payroll Company
+Applied Location
+Total EXP
+Rel EXP
+Current CTC
+EXP CTC
+Notice Period /LWD
+Once you rename your Google Sheet headers to match these, click Fetch Live Data again in your portal. All the red ✕ marks will turn into green checkmarks ✓, and your rows will populate correctly.
+Solution 2: Update Apps Script to Auto-Map Your Custom Columns
+If you cannot rename the columns inside your Google Sheet because they are locked or shared with other teams, you can update your Google Apps Script to automatically translate your sheet's actual column names into the names the portal requires before sending the JSON.
+Replace your Google Apps Script code with this updated snippet, making sure to replace the placeholder names on the right side of the mapping with your actual Google Sheet column headers:
+
+function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  
+  var headers = data.shift();
+  
+  var jsonData = data.map(function(row) {
+    var rawObj = {};
+    headers.forEach(function(header, i) {
+      rawObj[header.trim()] = row[i];
+    });
+    
+    // MAPPING: Change the strings on the right to match your EXACT Google Sheet column names
+    var mappedObj = {
+      "Candidate Name": rawObj["Your_Actual_Name_Column"] || "",
+      "Candidate ID": rawObj["Your_Actual_ID_Column"] || "",
+      "Recruiter Name": rawObj["Your_Actual_Recruiter_Column"] || "",
+      "Client": rawObj["Your_Actual_Client_Column"] || "",
+      "Mode of Req(FTE/C2H)": rawObj["Your_Actual_Mode_Column"] || "",
+      "Job Role": rawObj["Your_Actual_Role_Column"] || "",
+      "Req ID": rawObj["Your_Actual_ReqID_Column"] || "",
+      "Skill Bucket": rawObj["Your_Actual_Skill_Column"] || "",
+      "Date Of Submission": rawObj["Your_Actual_Date_Column"] || "",
+      "Profile Submission Status": rawObj["Your_Actual_SubStatus_Column"] || "",
+      "Interview Status": rawObj["Your_Actual_IntStatus_Column"] || "",
+      "Final Status": rawObj["Your_Actual_FinalStatus_Column"] || "",
+      "Current Location": rawObj["Your_Actual_Location_Column"] || "",
+      "Mobile No": rawObj["Your_Actual_Mobile_Column"] || "",
+      "Email ID": rawObj["Your_Actual_Email_Column"] || "",
+      "Current Company": rawObj["Your_Actual_Company_Column"] || "",
+      "Payroll Company": rawObj["Your_Actual_Payroll_Column"] || "",
+      "Applied Location": rawObj["Your_Actual_AppliedLoc_Column"] || "",
+      "Total EXP": rawObj["Your_Actual_TotalExp_Column"] || "",
+      "Rel EXP": rawObj["Your_Actual_RelExp_Column"] || "",
+      "Current CTC": rawObj["Your_Actual_CurCTC_Column"] || "",
+      "EXP CTC": rawObj["Your_Actual_ExpCTC_Column"] || "",
+      "Notice Period /LWD": rawObj["Your_Actual_Notice_Column"] || ""
+    };
+    
+    return mappedObj;
+  });
+
+  return ContentService.createTextOutput(JSON.stringify(jsonData))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+Note: After updating the Apps Script code, remember to go to Deploy > Manage deployments > Edit (pencil icon) > New version > Deploy so your localhost fetches the newly mapped version.
+
 ## License
 
 Add a license of your choice (e.g. MIT) as `LICENSE` in the repo root. This project handles personal data — use it in line with your organization's privacy policies.
