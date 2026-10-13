@@ -204,7 +204,7 @@ Missing columns are handled gracefully — the related charts or the candidate d
 - Requires internet for CDN libraries (can be vendored locally for offline use).
 - Ideas: backend/API with real auth, shared storage, direct Google Sheets API import, role-based views, vendored libraries for offline use.
 
-app script connecting backend servers..
+## Connecting the app script with Google sheets at backend for the portal 
 
 Key Advantages for Local Development
 Zero Local Server Setup: No need to configure express servers, database connections, or API keys locally.
@@ -241,6 +241,7 @@ function doGet() {
   return ContentService.createTextOutput(JSON.stringify(jsonData))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 Step 2: Deploy as a Public Web App API
 Click Deploy (top right) > New Deployment.
